@@ -1,0 +1,413 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Diuary Hub",
+    SubTitle = "OG",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+local player = game.Players.LocalPlayer
+
+-- ============================================
+-- ICONE FLUTUANTE PARA MOBILE
+-- ============================================
+
+local MobileIcon = nil
+local isVisible = true
+
+local function CreateMobileIcon()
+    local iconGui = Instance.new("ScreenGui")
+    iconGui.Name = "MobileIcon"
+    iconGui.Parent = game:GetService("CoreGui")
+    iconGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local iconButton = Instance.new("ImageButton")
+    iconButton.Size = UDim2.new(0, 60, 0, 60)
+    iconButton.Position = UDim2.new(1, -70, 0.5, -30)
+    iconButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    iconButton.BackgroundTransparency = 0.3
+    iconButton.BorderSizePixel = 0
+    iconButton.Image = "rbxassetid://3926305904"
+    iconButton.ScaleType = Enum.ScaleType.Fit
+    iconButton.Parent = iconGui
+    
+    local dragFrame = Instance.new("Frame")
+    dragFrame.Size = UDim2.new(1, 0, 1, 0)
+    dragFrame.BackgroundTransparency = 1
+    dragFrame.Parent = iconButton
+    
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+    
+    dragFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = iconButton.Position
+        end
+    end)
+    
+    dragFrame.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - dragStart
+            local newX = startPos.X.Scale + (delta.X / game:GetService("CoreGui").AbsoluteSize.X)
+            local newY = startPos.Y.Scale + (delta.Y / game:GetService("CoreGui").AbsoluteSize.Y)
+            iconButton.Position = UDim2.new(newX, 0, newY, 0)
+        end
+    end)
+    
+    dragFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    iconButton.MouseButton1Click:Connect(function()
+        if isVisible then
+            Window:SetVisible(false)
+            isVisible = false
+        else
+            Window:SetVisible(true)
+            isVisible = true
+        end
+    end)
+    
+    return iconGui
+end
+
+local MobileIconGui = CreateMobileIcon()
+
+-- ============================================
+-- AUTO PET
+-- ============================================
+
+local isActive = false
+local collectingLock = false
+local AutoPetLoop = nil
+local COLLECT_DISTANCE = 25
+local CHECK_INTERVAL = 0.1
+
+local petFolders = {
+    {path = {"Tsunami", "Gen", "R7"}, name = "R7"},
+    {path = {"Tsunami", "Gen", "R8"}, name = "R8"}
+}
+
+local function getPlayerPosition()
+    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        return player.Character.HumanoidRootPart.Position
+    end
+    return nil
+end
+
+local function getPetFolder(folderPath)
+    local current = workspace
+    for _, folderName in ipairs(folderPath) do
+        current = current:FindFirstChild(folderName)
+        if not current then
+            return nil
+        end
+    end
+    return current
+end
+
+local function pressE()
+    local virtualInput = game:GetService("VirtualInputManager")
+    virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.9)
+    virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+end
+
+local function autoCollectPet(pet, folderName)
+    if not pet or not pet.Parent then return false end
+    if not player or not player.Character then return false end
+    
+    pressE()
+    
+    for _, prompt in ipairs(pet:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") then
+            prompt:PromptButtonHold(player)
+        end
+    end
+    
+    local clickDetector = pet:FindFirstChildWhichIsA("ClickDetector")
+    if clickDetector then
+        clickDetector:Click()
+    end
+    
+    local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        local touchInterest = pet:FindFirstChild("TouchInterest")
+        if touchInterest then
+            firetouchinterest(pet, humanoidRootPart, 0)
+            firetouchinterest(pet, humanoidRootPart, 1)
+        end
+    end
+    
+    for _, remote in ipairs(pet:GetDescendants()) do
+        if remote:IsA("RemoteEvent") and (remote.Name:lower():find("collect") or remote.Name:lower():find("click")) then
+            remote:FireServer()
+        end
+    end
+    
+    local petPart = pet:IsA("BasePart") and pet or pet:FindFirstChildWhichIsA("BasePart")
+    if petPart then
+        local mouse = player:GetMouse()
+        if mouse then
+            mouse.Target = petPart
+            mouse.Button1Click:Fire()
+        end
+    end
+    
+    return true
+end
+
+local function collectPetsInFolder(folder, folderName)
+    if not folder then return false end
+    
+    local playerPos = getPlayerPosition()
+    if not playerPos then return false end
+    
+    for _, pet in ipairs(folder:GetChildren()) do
+        if pet and pet.Parent then
+            local petPart = pet:FindFirstChild("PrimaryPart") or 
+                            pet:FindFirstChild("HumanoidRootPart") or 
+                            (pet:IsA("BasePart") and pet) or
+                            pet:FindFirstChildWhichIsA("BasePart")
+            
+            if petPart and petPart.Parent then
+                local distance = (playerPos - petPart.Position).Magnitude
+                if distance <= COLLECT_DISTANCE then
+                    autoCollectPet(pet, folderName)
+                    task.wait(0.05)
+                end
+            end
+        end
+    end
+    
+    return false
+end
+
+local function collectAllNearbyPets()
+    for _, folderInfo in ipairs(petFolders) do
+        local folder = getPetFolder(folderInfo.path)
+        if folder then
+            collectPetsInFolder(folder, folderInfo.name)
+        end
+    end
+end
+
+local function autoCollectLoop()
+    while isActive do
+        if not collectingLock then
+            collectingLock = true
+            pcall(function()
+                collectAllNearbyPets()
+            end)
+            collectingLock = false
+        end
+        task.wait(CHECK_INTERVAL)
+    end
+end
+
+local function StartAutoPet()
+    if AutoPetLoop then return end
+    isActive = true
+    AutoPetLoop = task.spawn(autoCollectLoop)
+    Fluent:Notify({
+        Title = "Auto Pet",
+        Content = "Ligado",
+        Duration = 2
+    })
+end
+
+local function StopAutoPet()
+    isActive = false
+    if AutoPetLoop then
+        coroutine.close(AutoPetLoop)
+        AutoPetLoop = nil
+    end
+    Fluent:Notify({
+        Title = "Auto Pet",
+        Content = "Desligado",
+        Duration = 2
+    })
+end
+
+local AutoPetToggle = Tabs.Main:AddToggle("AutoPetToggle", {
+    Title = "Auto Pet",
+    Default = false
+})
+
+AutoPetToggle:OnChanged(function()
+    if Options.AutoPetToggle.Value then
+        StartAutoPet()
+    else
+        StopAutoPet()
+    end
+end)
+
+-- ============================================
+-- SPEED (WALKSPEED)
+-- ============================================
+
+local SpeedEnabled = false
+local SpeedLoop = nil
+
+local function SetSpeed(Speed)
+    local Character = player.Character
+    if Character and Character:FindFirstChild("Humanoid") then
+        local Humanoid = Character.Humanoid
+        if Humanoid.Health > 0 then
+            Humanoid.WalkSpeed = Speed
+        end
+    end
+end
+
+local function StartSpeedLoop()
+    if SpeedLoop then return end
+    SpeedLoop = game:GetService("RunService").Heartbeat:Connect(function()
+        if SpeedEnabled then
+            local Character = player.Character
+            if Character and Character:FindFirstChild("Humanoid") then
+                local Humanoid = Character.Humanoid
+                if Humanoid.WalkSpeed ~= 450 and Humanoid.Health > 0 then
+                    Humanoid.WalkSpeed = 450
+                end
+            end
+        end
+    end)
+end
+
+local function StopSpeedLoop()
+    if SpeedLoop then
+        SpeedLoop:Disconnect()
+        SpeedLoop = nil
+    end
+end
+
+local SpeedToggle = Tabs.Main:AddToggle("SpeedToggle", {
+    Title = "Speed",
+    Default = false
+})
+
+SpeedToggle:OnChanged(function()
+    SpeedEnabled = Options.SpeedToggle.Value
+    if SpeedEnabled then
+        SetSpeed(450)
+        StartSpeedLoop()
+    else
+        SetSpeed(16)
+        StopSpeedLoop()
+    end
+end)
+
+player.CharacterAdded:Connect(function(Character)
+    Character:WaitForChild("Humanoid")
+    task.wait(0.5)
+    if SpeedEnabled then
+        SetSpeed(450)
+    end
+end)
+
+-- ============================================
+-- NOCLIP
+-- ============================================
+
+local NoclipEnabled = false
+local NoclipConnection = nil
+
+local function StartNoclip()
+    if NoclipConnection then return end
+    NoclipConnection = game:GetService("RunService").Stepped:Connect(function()
+        if NoclipEnabled then
+            local Character = player.Character
+            if Character then
+                for _, part in pairs(Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function StopNoclip()
+    if NoclipConnection then
+        NoclipConnection:Disconnect()
+        NoclipConnection = nil
+    end
+    local Character = player.Character
+    if Character then
+        for _, part in pairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+local NoclipToggle = Tabs.Main:AddToggle("NoclipToggle", {
+    Title = "Noclip",
+    Default = false
+})
+
+NoclipToggle:OnChanged(function()
+    NoclipEnabled = Options.NoclipToggle.Value
+    if NoclipEnabled then
+        StartNoclip()
+    else
+        StopNoclip()
+    end
+end)
+
+-- ============================================
+-- SETTINGS
+-- ============================================
+
+Tabs.Settings:AddButton({
+    Title = "Fechar UI",
+    Callback = function()
+        Window:Destroy()
+        if MobileIconGui then MobileIconGui:Destroy() end
+    end
+})
+
+Tabs.Settings:AddButton({
+    Title = "Resetar Tudo",
+    Callback = function()
+        if Options.AutoPetToggle.Value then
+            Options.AutoPetToggle:SetValue(false)
+        end
+        if Options.SpeedToggle.Value then
+            Options.SpeedToggle:SetValue(false)
+        end
+        if Options.NoclipToggle.Value then
+            Options.NoclipToggle:SetValue(false)
+        end
+        Fluent:Notify({
+            Title = "Resetado",
+            Content = "Todas funcoes desativadas",
+            Duration = 2
+        })
+    end
+})
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "Diuary Hub",
+    Content = "Clique no icone para minimizar",
+    Duration = 5
+})
