@@ -19,74 +19,112 @@ local Options = Fluent.Options
 local player = game.Players.LocalPlayer
 
 -- ============================================
--- ICONE FLUTUANTE PARA MOBILE
+-- ICONE FLUTUANTE PARA MOBILE/PC (CORRIGIDO)
 -- ============================================
 
-local MobileIcon = nil
 local isVisible = true
+local MobileIconGui = nil
 
 local function CreateMobileIcon()
     local iconGui = Instance.new("ScreenGui")
     iconGui.Name = "MobileIcon"
     iconGui.Parent = game:GetService("CoreGui")
     iconGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    iconGui.DisplayOrder = 999
+    iconGui.ResetOnSpawn = false
     
     local iconButton = Instance.new("ImageButton")
     iconButton.Size = UDim2.new(0, 60, 0, 60)
-    iconButton.Position = UDim2.new(1, -70, 0.5, -30)
+    iconButton.Position = UDim2.new(1, -75, 0.85, -30)
     iconButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    iconButton.BackgroundTransparency = 0.3
+    iconButton.BackgroundTransparency = 0.4
     iconButton.BorderSizePixel = 0
     iconButton.Image = "rbxassetid://3926305904"
     iconButton.ScaleType = Enum.ScaleType.Fit
+    iconButton.AutoButtonColor = true
     iconButton.Parent = iconGui
     
-    local dragFrame = Instance.new("Frame")
-    dragFrame.Size = UDim2.new(1, 0, 1, 0)
-    dragFrame.BackgroundTransparency = 1
-    dragFrame.Parent = iconButton
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = iconButton
+    
+    local function updatePosition()
+        if savedPosition then
+            iconButton.Position = savedPosition
+        end
+    end
     
     local dragging = false
     local dragStart = nil
     local startPos = nil
+    local savedPosition = nil
     
-    dragFrame.InputBegan:Connect(function(input)
+    local UserInputService = game:GetService("UserInputService")
+    
+    local function onInputBegan(input, gameProcessed)
+        if gameProcessed then return end
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
             startPos = iconButton.Position
         end
-    end)
+    end
     
-    dragFrame.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-            local delta = input.Position - dragStart
-            local newX = startPos.X.Scale + (delta.X / game:GetService("CoreGui").AbsoluteSize.X)
-            local newY = startPos.Y.Scale + (delta.Y / game:GetService("CoreGui").AbsoluteSize.Y)
-            iconButton.Position = UDim2.new(newX, 0, newY, 0)
+    local function onInputChanged(input)
+        if dragging then
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+                local delta = input.Position - dragStart
+                local screenSize = game:GetService("CoreGui").AbsoluteSize
+                local newX = startPos.X.Scale + (delta.X / screenSize.X)
+                local newY = startPos.Y.Scale + (delta.Y / screenSize.Y)
+                newX = math.clamp(newX, 0, 1)
+                newY = math.clamp(newY, 0, 1)
+                iconButton.Position = UDim2.new(newX, 0, newY, 0)
+            end
         end
-    end)
+    end
     
-    dragFrame.InputEnded:Connect(function(input)
+    local function onInputEnded(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = false
+            savedPosition = iconButton.Position
         end
-    end)
+    end
     
-    iconButton.MouseButton1Click:Connect(function()
+    UserInputService.InputBegan:Connect(onInputBegan)
+    UserInputService.InputChanged:Connect(onInputChanged)
+    UserInputService.InputEnded:Connect(onInputEnded)
+    
+    local function toggleUI()
         if isVisible then
             Window:SetVisible(false)
             isVisible = false
+            iconButton.Image = "rbxassetid://3926305904"
         else
             Window:SetVisible(true)
             isVisible = true
+            iconButton.Image = "rbxassetid://3926305904"
         end
-    end)
+    end
+    
+    iconButton.MouseButton1Click:Connect(toggleUI)
+    
+    local heartEmoji = Instance.new("TextLabel")
+    heartEmoji.Size = UDim2.new(1, 0, 1, 0)
+    heartEmoji.BackgroundTransparency = 1
+    heartEmoji.Text = "💛"
+    heartEmoji.TextColor3 = Color3.fromRGB(255, 255, 0)
+    heartEmoji.TextSize = 40
+    heartEmoji.Font = Enum.Font.GothamBold
+    heartEmoji.TextScaled = true
+    heartEmoji.Parent = iconButton
+    
+    iconButton.Image = ""
     
     return iconGui
 end
 
-local MobileIconGui = CreateMobileIcon()
+MobileIconGui = CreateMobileIcon()
 
 -- ============================================
 -- AUTO PET
@@ -321,7 +359,7 @@ player.CharacterAdded:Connect(function(Character)
 end)
 
 -- ============================================
--- NOCLIP CORRIGIDO (SEM BUG)
+-- NOCLIP CORRIGIDO
 -- ============================================
 
 local NoclipEnabled = false
@@ -580,6 +618,6 @@ Window:SelectTab(1)
 
 Fluent:Notify({
     Title = "Diuary Hub",
-    Content = "Clique no icone para minimizar",
+    Content = "Clique no icone 💛 para minimizar",
     Duration = 5
 })
