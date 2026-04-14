@@ -16,12 +16,14 @@ local NoWaveActive = false
 local DivinoActive = false
 local PrismaticoActive = false
 local AntiAFKActive = false
+local AutoCollectActive = false
 local SpeedLoop = nil
 local NoclipConnection = nil
 local NoWaveLoop = nil
 local DivinoLoop = nil
 local PrismaticoLoop = nil
 local AntiAFKConnection = nil
+local AutoCollectLoop = nil
 local healthConnection = nil
 
 -- POSICOES FIXAS
@@ -64,8 +66,8 @@ menuGui.ResetOnSpawn = false
 menuGui.Enabled = true
 
 local menuFrame = Instance.new("Frame")
-menuFrame.Size = UDim2.new(0, 220, 0, 370)
-menuFrame.Position = UDim2.new(0.5, -110, 0.35, 0)
+menuFrame.Size = UDim2.new(0, 220, 0, 420)
+menuFrame.Position = UDim2.new(0.5, -110, 0.3, 0)
 menuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 menuFrame.BackgroundTransparency = 0.15
 menuFrame.BorderSizePixel = 0
@@ -221,11 +223,121 @@ function SetAntiAFK(active)
         if AntiAFKConnection then coroutine.close(AntiAFKConnection) end
         AntiAFKConnection = coroutine.create(AntiAFKLoop)
         coroutine.resume(AntiAFKConnection)
-        print("Anti-AFK: ON")
     else
         if AntiAFKConnection then coroutine.close(AntiAFKConnection) end
         AntiAFKConnection = nil
-        print("Anti-AFK: OFF")
+    end
+end
+
+-- ============================================
+-- AUTO COLLECT (COLETA A DISTANCIA)
+-- ============================================
+
+local collectedPets = {}
+local totalCollected = 0
+local COLLECT_DELAY = 0.5
+
+local function isMyPet(pet)
+    if pet.Name:find(player.Name) then
+        return true
+    end
+    
+    local attrs = pet:GetAttributes()
+    for k, v in pairs(attrs) do
+        if tostring(v):find(player.Name) or tostring(v) == tostring(player.UserId) then
+            return true
+        end
+    end
+    
+    for _, child in pairs(pet:GetChildren()) do
+        if child.Name:lower():find("owner") or child.Name:lower():find("player") then
+            if child:IsA("ObjectValue") and child.Value == player then
+                return true
+            end
+        end
+    end
+    
+    return false
+end
+
+local function collectPetRemote(pet)
+    if not pet or not pet.Parent then return false end
+    
+    local remote = pet:FindFirstChild("RE")
+    if not remote then return false end
+    
+    local args = { [1] = "Collect" }
+    remote:FireServer(unpack(args))
+    
+    return true
+end
+
+local function collectMyPets()
+    local petsFolder = workspace:FindFirstChild("Tsunami")
+    if petsFolder then
+        petsFolder = petsFolder:FindFirstChild("Pets")
+    end
+    
+    if not petsFolder then return 0 end
+    
+    local collected = 0
+    
+    for _, pet in pairs(petsFolder:GetChildren()) do
+        if isMyPet(pet) then
+            local remote = pet:FindFirstChild("RE")
+            if remote then
+                collectPetRemote(pet)
+                collected = collected + 1
+                totalCollected = totalCollected + 1
+                task.wait(0.1)
+            end
+        end
+    end
+    
+    return collected
+end
+
+local function monitorNewPets()
+    local petsFolder = workspace:FindFirstChild("Tsunami")
+    if petsFolder then
+        petsFolder = petsFolder:FindFirstChild("Pets")
+    end
+    
+    if not petsFolder then return end
+    
+    petsFolder.ChildAdded:Connect(function(newPet)
+        if AutoCollectActive then
+            task.wait(0.3)
+            if isMyPet(newPet) then
+                local remote = newPet:FindFirstChild("RE")
+                if remote then
+                    collectPetRemote(newPet)
+                    totalCollected = totalCollected + 1
+                end
+            end
+        end
+    end)
+end
+
+local function autoCollectLoop()
+    while AutoCollectActive do
+        pcall(function()
+            collectMyPets()
+        end)
+        task.wait(COLLECT_DELAY)
+    end
+end
+
+function SetAutoCollect(active)
+    AutoCollectActive = active
+    if AutoCollectActive then
+        if AutoCollectLoop then coroutine.close(AutoCollectLoop) end
+        AutoCollectLoop = coroutine.create(autoCollectLoop)
+        coroutine.resume(AutoCollectLoop)
+        monitorNewPets()
+    else
+        if AutoCollectLoop then coroutine.close(AutoCollectLoop) end
+        AutoCollectLoop = nil
     end
 end
 
@@ -262,11 +374,9 @@ function SetDivino(active)
         if DivinoLoop then coroutine.close(DivinoLoop) end
         DivinoLoop = coroutine.create(divinoLoop)
         coroutine.resume(DivinoLoop)
-        print("Divino: ON")
     else
         if DivinoLoop then coroutine.close(DivinoLoop) end
         DivinoLoop = nil
-        print("Divino: OFF")
     end
 end
 
@@ -303,11 +413,9 @@ function SetPrismatico(active)
         if PrismaticoLoop then coroutine.close(PrismaticoLoop) end
         PrismaticoLoop = coroutine.create(prismaticoLoop)
         coroutine.resume(PrismaticoLoop)
-        print("Prismatico: ON")
     else
         if PrismaticoLoop then coroutine.close(PrismaticoLoop) end
         PrismaticoLoop = nil
-        print("Prismatico: OFF")
     end
 end
 
@@ -333,7 +441,6 @@ function SetSpeed(active)
                 end
             end
         end)
-        print("Speed: ON (450)")
     else
         if SpeedLoop then
             SpeedLoop:Disconnect()
@@ -343,7 +450,6 @@ function SetSpeed(active)
         if Character and Character:FindFirstChild("Humanoid") then
             Character.Humanoid.WalkSpeed = 16
         end
-        print("Speed: OFF")
     end
 end
 
@@ -367,7 +473,6 @@ function SetNoclip(active)
                 end
             end
         end)
-        print("Noclip: ON")
     else
         if NoclipConnection then
             NoclipConnection:Disconnect()
@@ -381,7 +486,6 @@ function SetNoclip(active)
                 end
             end
         end
-        print("Noclip: OFF")
     end
 end
 
@@ -448,7 +552,6 @@ function SetNoWave(active)
         coroutine.resume(NoWaveLoop)
         protectPlayer()
         destroyWaves()
-        print("No Wave: ON")
     else
         if NoWaveLoop then 
             coroutine.close(NoWaveLoop) 
@@ -458,7 +561,6 @@ function SetNoWave(active)
             healthConnection:Disconnect()
             healthConnection = nil
         end
-        print("No Wave: OFF")
     end
 end
 
@@ -472,8 +574,9 @@ createToggle("Speed 450", 131, function() return SpeedActive end, SetSpeed)
 createToggle("Noclip", 174, function() return NoclipActive end, SetNoclip)
 createToggle("No Wave", 217, function() return NoWaveActive end, SetNoWave)
 createToggle("Anti-AFK", 260, function() return AntiAFKActive end, SetAntiAFK)
+createToggle("Auto Collect", 303, function() return AutoCollectActive end, SetAutoCollect)
 
-local closeBtn = createButton("Fechar", 315, function()
+local closeBtn = createButton("Fechar", 360, function()
     menuGui.Enabled = false
 end)
 
