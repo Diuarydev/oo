@@ -19,112 +19,84 @@ local Options = Fluent.Options
 local player = game.Players.LocalPlayer
 
 -- ============================================
--- ICONE FLUTUANTE PARA MOBILE/PC (CORRIGIDO)
+-- ICONE FLUTUANTE (CORRIGIDO - MOBILE/PC)
 -- ============================================
 
-local isVisible = true
-local MobileIconGui = nil
+local iconGui = Instance.new("ScreenGui")
+iconGui.Name = "DiuaryIcon"
+iconGui.Parent = game:GetService("CoreGui")
+iconGui.ResetOnSpawn = false
+iconGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-local function CreateMobileIcon()
-    local iconGui = Instance.new("ScreenGui")
-    iconGui.Name = "MobileIcon"
-    iconGui.Parent = game:GetService("CoreGui")
-    iconGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    iconGui.DisplayOrder = 999
-    iconGui.ResetOnSpawn = false
-    
-    local iconButton = Instance.new("ImageButton")
-    iconButton.Size = UDim2.new(0, 60, 0, 60)
-    iconButton.Position = UDim2.new(1, -75, 0.85, -30)
-    iconButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    iconButton.BackgroundTransparency = 0.4
-    iconButton.BorderSizePixel = 0
-    iconButton.Image = "rbxassetid://3926305904"
-    iconButton.ScaleType = Enum.ScaleType.Fit
-    iconButton.AutoButtonColor = true
-    iconButton.Parent = iconGui
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(1, 0)
-    corner.Parent = iconButton
-    
-    local function updatePosition()
-        if savedPosition then
-            iconButton.Position = savedPosition
+local iconButton = Instance.new("TextButton")
+iconButton.Size = UDim2.new(0, 55, 0, 55)
+iconButton.Position = UDim2.new(1, -65, 0.85, -30)
+iconButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+iconButton.BackgroundTransparency = 0.3
+iconButton.Text = "💛"
+iconButton.TextColor3 = Color3.fromRGB(255, 255, 0)
+iconButton.TextSize = 35
+iconButton.Font = Enum.Font.GothamBold
+iconButton.BorderSizePixel = 0
+iconButton.Parent = iconGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(1, 0)
+corner.Parent = iconButton
+
+-- Variaveis de arrasto
+local dragging = false
+local dragStart = nil
+local startPos = nil
+local wasDragged = false
+local uiVisible = true
+local UserInputService = game:GetService("UserInputService")
+
+-- CORRIGIDO: InputBegan no botão
+iconButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        wasDragged = false
+        dragStart = input.Position
+        startPos = iconButton.Position
+    end
+end)
+
+-- CORRIGIDO: InputChanged no UserInputService (captura movimento fora do botão)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging then
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            -- Só considera arrasto se moveu mais de 10px
+            if math.abs(delta.X) > 10 or math.abs(delta.Y) > 10 then
+                wasDragged = true
+            end
+            local screenSize = workspace.CurrentCamera.ViewportSize
+            local newX = startPos.X.Scale + (delta.X / screenSize.X)
+            local newY = startPos.Y.Scale + (delta.Y / screenSize.Y)
+            newX = math.clamp(newX, 0, 0.88)
+            newY = math.clamp(newY, 0, 0.88)
+            iconButton.Position = UDim2.new(newX, 0, newY, 0)
         end
     end
-    
-    local dragging = false
-    local dragStart = nil
-    local startPos = nil
-    local savedPosition = nil
-    
-    local UserInputService = game:GetService("UserInputService")
-    
-    local function onInputBegan(input, gameProcessed)
-        if gameProcessed then return end
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = iconButton.Position
-        end
-    end
-    
-    local function onInputChanged(input)
-        if dragging then
-            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
-                local delta = input.Position - dragStart
-                local screenSize = game:GetService("CoreGui").AbsoluteSize
-                local newX = startPos.X.Scale + (delta.X / screenSize.X)
-                local newY = startPos.Y.Scale + (delta.Y / screenSize.Y)
-                newX = math.clamp(newX, 0, 1)
-                newY = math.clamp(newY, 0, 1)
-                iconButton.Position = UDim2.new(newX, 0, newY, 0)
+end)
+
+-- CORRIGIDO: InputEnded decide se foi clique ou arrasto
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if dragging and not wasDragged then
+            -- Foi um toque simples: abre/fecha
+            if uiVisible then
+                Window:SetVisible(false)
+                uiVisible = false
+            else
+                Window:SetVisible(true)
+                uiVisible = true
             end
         end
+        dragging = false
     end
-    
-    local function onInputEnded(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-            savedPosition = iconButton.Position
-        end
-    end
-    
-    UserInputService.InputBegan:Connect(onInputBegan)
-    UserInputService.InputChanged:Connect(onInputChanged)
-    UserInputService.InputEnded:Connect(onInputEnded)
-    
-    local function toggleUI()
-        if isVisible then
-            Window:SetVisible(false)
-            isVisible = false
-            iconButton.Image = "rbxassetid://3926305904"
-        else
-            Window:SetVisible(true)
-            isVisible = true
-            iconButton.Image = "rbxassetid://3926305904"
-        end
-    end
-    
-    iconButton.MouseButton1Click:Connect(toggleUI)
-    
-    local heartEmoji = Instance.new("TextLabel")
-    heartEmoji.Size = UDim2.new(1, 0, 1, 0)
-    heartEmoji.BackgroundTransparency = 1
-    heartEmoji.Text = "💛"
-    heartEmoji.TextColor3 = Color3.fromRGB(255, 255, 0)
-    heartEmoji.TextSize = 40
-    heartEmoji.Font = Enum.Font.GothamBold
-    heartEmoji.TextScaled = true
-    heartEmoji.Parent = iconButton
-    
-    iconButton.Image = ""
-    
-    return iconGui
-end
-
-MobileIconGui = CreateMobileIcon()
+end)
 
 -- ============================================
 -- AUTO PET
@@ -587,7 +559,7 @@ Tabs.Settings:AddButton({
     Title = "Fechar UI",
     Callback = function()
         Window:Destroy()
-        if MobileIconGui then MobileIconGui:Destroy() end
+        iconGui:Destroy()
     end
 })
 
