@@ -28,7 +28,7 @@ local R8_POSITION = Vector3.new(-1593.5523681640625, -70.22384643554688, 4064.42
 local BASE_POSITION = Vector3.new(905.006103515625, -23.359270095825195, 4066.5439453125)
 
 -- ============================================
--- ICONE FLUTUANTE (PROPORCOES CORRIGIDAS)
+-- ICONE FLUTUANTE
 -- ============================================
 
 local iconGui = Instance.new("ScreenGui")
@@ -52,7 +52,7 @@ corner.CornerRadius = UDim.new(1, 0)
 corner.Parent = iconButton
 
 -- ============================================
--- MENU PRINCIPAL (PROPORCOES CORRIGIDAS)
+-- MENU PRINCIPAL
 -- ============================================
 
 local menuGui = Instance.new("ScreenGui")
@@ -75,7 +75,6 @@ local menuCorner = Instance.new("UICorner")
 menuCorner.CornerRadius = UDim.new(0, 12)
 menuCorner.Parent = menuFrame
 
--- TITULO
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 35)
 title.Position = UDim2.new(0, 0, 0, 0)
@@ -86,7 +85,6 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 18
 title.Parent = menuFrame
 
--- LINHA SEPARADORA
 local line = Instance.new("Frame")
 line.Size = UDim2.new(0.9, 0, 0, 1)
 line.Position = UDim2.new(0.05, 0, 0, 35)
@@ -95,7 +93,7 @@ line.BorderSizePixel = 0
 line.Parent = menuFrame
 
 -- ============================================
--- FUNCAO CRIAR TOGGLE (PROPORCOES CORRIGIDAS)
+-- FUNCOES DOS BOTOES
 -- ============================================
 
 local function createToggle(text, yPos, getState, setState)
@@ -134,10 +132,6 @@ local function createToggle(text, yPos, getState, setState)
     return btn
 end
 
--- ============================================
--- FUNCAO CRIAR BOTAO (PROPORCOES CORRIGIDAS)
--- ============================================
-
 local function createButton(text, yPos, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0.85, 0, 0, 38)
@@ -165,7 +159,7 @@ local function teleport(pos)
     local char = player.Character
     if char and char:FindFirstChild("HumanoidRootPart") then
         char.HumanoidRootPart.CFrame = CFrame.new(pos)
-        task.wait(0.1)
+        task.wait(0.05)
     end
 end
 
@@ -177,7 +171,9 @@ local function findPets(folderName)
         local folder = gen:FindFirstChild(folderName)
         if folder then
             for _, p in pairs(folder:GetChildren()) do
-                table.insert(pets, p)
+                if p and p.Parent then
+                    table.insert(pets, p)
+                end
             end
         end
     end
@@ -192,65 +188,42 @@ local function getPetPos(pet)
     return part and part.Position or nil
 end
 
-local function pressE()
+-- Coleta rapida otimizada
+local function quickCollect()
     local vm = game:GetService("VirtualInputManager")
     vm:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(1)
+    task.wait(0.2)
     vm:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    task.wait(0.3)
-end
-
-local function tryOtherMethods(pet)
-    for _, prompt in pairs(pet:GetDescendants()) do
-        if prompt:IsA("ProximityPrompt") then
-            pcall(function() prompt:PromptButtonHold(player) end)
-        end
-    end
-    
-    local click = pet:FindFirstChildWhichIsA("ClickDetector")
-    if click then
-        pcall(function() click:Click() end)
-    end
-    
-    for _, remote in pairs(pet:GetDescendants()) do
-        if remote:IsA("RemoteEvent") then
-            local name = remote.Name:lower()
-            if name:find("collect") or name:find("click") or name:find("claim") then
-                pcall(function() remote:FireServer() end)
-            end
-        end
-    end
+    task.wait(0.1)
 end
 
 -- ============================================
--- DIVINO - R7
+-- DIVINO - R7 (OTIMIZADO)
 -- ============================================
 
 local function divinoLoop()
     while DivinoActive do
+        -- Vai para o R7
         teleport(R7_POSITION)
-        task.wait(1)
+        task.wait(0.3)
         
+        -- Coleta os pets
         local pets = findPets("R7")
-        
         if #pets > 0 then
             for _, pet in pairs(pets) do
                 local petPos = getPetPos(pet)
                 if petPos then
                     teleport(petPos)
-                    task.wait(0.5)
-                    pressE()
-                    tryOtherMethods(pet)
-                    print("Divino coletou:", pet.Name)
-                    task.wait(0.5)
+                    task.wait(0.15)
+                    quickCollect()
+                    task.wait(0.15)
                 end
             end
-            
-            teleport(BASE_POSITION)
-            task.wait(1)
-        else
-            task.wait(2)
         end
+        
+        -- Volta para base e espera 2 segundos
+        teleport(BASE_POSITION)
+        task.wait(2) -- Espera 2 segundos na base
     end
 end
 
@@ -269,34 +242,32 @@ function SetDivino(active)
 end
 
 -- ============================================
--- PRISMATICO - R8
+-- PRISMATICO - R8 (OTIMIZADO)
 -- ============================================
 
 local function prismaticoLoop()
     while PrismaticoActive do
+        -- Vai para o R8
         teleport(R8_POSITION)
-        task.wait(1)
+        task.wait(0.3)
         
+        -- Coleta os pets
         local pets = findPets("R8")
-        
         if #pets > 0 then
             for _, pet in pairs(pets) do
                 local petPos = getPetPos(pet)
                 if petPos then
                     teleport(petPos)
-                    task.wait(0.5)
-                    pressE()
-                    tryOtherMethods(pet)
-                    print("Prismatico coletou:", pet.Name)
-                    task.wait(0.5)
+                    task.wait(0.15)
+                    quickCollect()
+                    task.wait(0.15)
                 end
             end
-            
-            teleport(BASE_POSITION)
-            task.wait(1)
-        else
-            task.wait(2)
         end
+        
+        -- Volta para base e espera 2 segundos
+        teleport(BASE_POSITION)
+        task.wait(2) -- Espera 2 segundos na base
     end
 end
 
@@ -480,7 +451,7 @@ local closeBtn = createButton("Fechar", 270, function()
 end)
 
 -- ============================================
--- CONTROLE DO ICONE (ABRIR/FECHAR MENU)
+-- CONTROLE DO ICONE
 -- ============================================
 
 local menuVisible = true
