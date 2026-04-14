@@ -15,11 +15,13 @@ local NoclipActive = false
 local NoWaveActive = false
 local DivinoActive = false
 local PrismaticoActive = false
+local AntiAFKActive = false
 local SpeedLoop = nil
 local NoclipConnection = nil
 local NoWaveLoop = nil
 local DivinoLoop = nil
 local PrismaticoLoop = nil
+local AntiAFKConnection = nil
 local healthConnection = nil
 
 -- POSICOES FIXAS
@@ -62,7 +64,7 @@ menuGui.ResetOnSpawn = false
 menuGui.Enabled = true
 
 local menuFrame = Instance.new("Frame")
-menuFrame.Size = UDim2.new(0, 220, 0, 320)
+menuFrame.Size = UDim2.new(0, 220, 0, 370)
 menuFrame.Position = UDim2.new(0.5, -110, 0.35, 0)
 menuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 menuFrame.BackgroundTransparency = 0.15
@@ -198,16 +200,44 @@ local function quickCollect()
 end
 
 -- ============================================
+-- ANTI-AFK
+-- ============================================
+
+local VirtualUser = game:GetService("VirtualUser")
+
+local function AntiAFKLoop()
+    while AntiAFKActive do
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+        task.wait(60)
+    end
+end
+
+function SetAntiAFK(active)
+    AntiAFKActive = active
+    if AntiAFKActive then
+        if AntiAFKConnection then coroutine.close(AntiAFKConnection) end
+        AntiAFKConnection = coroutine.create(AntiAFKLoop)
+        coroutine.resume(AntiAFKConnection)
+        print("Anti-AFK: ON")
+    else
+        if AntiAFKConnection then coroutine.close(AntiAFKConnection) end
+        AntiAFKConnection = nil
+        print("Anti-AFK: OFF")
+    end
+end
+
+-- ============================================
 -- DIVINO - R7 (OTIMIZADO)
 -- ============================================
 
 local function divinoLoop()
     while DivinoActive do
-        -- Vai para o R7
         teleport(R7_POSITION)
         task.wait(0.3)
         
-        -- Coleta os pets
         local pets = findPets("R7")
         if #pets > 0 then
             for _, pet in pairs(pets) do
@@ -221,9 +251,8 @@ local function divinoLoop()
             end
         end
         
-        -- Volta para base e espera 2 segundos
         teleport(BASE_POSITION)
-        task.wait(2) -- Espera 2 segundos na base
+        task.wait(2)
     end
 end
 
@@ -247,11 +276,9 @@ end
 
 local function prismaticoLoop()
     while PrismaticoActive do
-        -- Vai para o R8
         teleport(R8_POSITION)
         task.wait(0.3)
         
-        -- Coleta os pets
         local pets = findPets("R8")
         if #pets > 0 then
             for _, pet in pairs(pets) do
@@ -265,9 +292,8 @@ local function prismaticoLoop()
             end
         end
         
-        -- Volta para base e espera 2 segundos
         teleport(BASE_POSITION)
-        task.wait(2) -- Espera 2 segundos na base
+        task.wait(2)
     end
 end
 
@@ -445,8 +471,9 @@ createToggle("Prismatico", 88, function() return PrismaticoActive end, SetPrisma
 createToggle("Speed 450", 131, function() return SpeedActive end, SetSpeed)
 createToggle("Noclip", 174, function() return NoclipActive end, SetNoclip)
 createToggle("No Wave", 217, function() return NoWaveActive end, SetNoWave)
+createToggle("Anti-AFK", 260, function() return AntiAFKActive end, SetAntiAFK)
 
-local closeBtn = createButton("Fechar", 270, function()
+local closeBtn = createButton("Fechar", 315, function()
     menuGui.Enabled = false
 end)
 
