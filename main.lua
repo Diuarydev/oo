@@ -19,7 +19,7 @@ local Options = Fluent.Options
 local player = game.Players.LocalPlayer
 
 -- ============================================
--- ICONE FLUTUANTE (CORRIGIDO - MOBILE/PC)
+-- ICONE FLUTUANTE (CORRIGIDO)
 -- ============================================
 
 local iconGui = Instance.new("ScreenGui")
@@ -44,7 +44,6 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(1, 0)
 corner.Parent = iconButton
 
--- Variaveis de arrasto
 local dragging = false
 local dragStart = nil
 local startPos = nil
@@ -52,7 +51,6 @@ local wasDragged = false
 local uiVisible = true
 local UserInputService = game:GetService("UserInputService")
 
--- CORRIGIDO: InputBegan no botão
 iconButton.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
@@ -62,30 +60,31 @@ iconButton.InputBegan:Connect(function(input)
     end
 end)
 
--- CORRIGIDO: InputChanged no UserInputService (captura movimento fora do botão)
 UserInputService.InputChanged:Connect(function(input)
-    if dragging then
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStart
-            -- Só considera arrasto se moveu mais de 10px
-            if math.abs(delta.X) > 10 or math.abs(delta.Y) > 10 then
-                wasDragged = true
-            end
-            local screenSize = workspace.CurrentCamera.ViewportSize
-            local newX = startPos.X.Scale + (delta.X / screenSize.X)
-            local newY = startPos.Y.Scale + (delta.Y / screenSize.Y)
-            newX = math.clamp(newX, 0, 0.88)
-            newY = math.clamp(newY, 0, 0.88)
-            iconButton.Position = UDim2.new(newX, 0, newY, 0)
+    if not dragging then return end
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        if math.abs(delta.X) > 10 or math.abs(delta.Y) > 10 then
+            wasDragged = true
         end
+        local screenSize = workspace.CurrentCamera.ViewportSize
+        local newX = startPos.X.Scale + (delta.X / screenSize.X)
+        local newY = startPos.Y.Scale + (delta.Y / screenSize.Y)
+        newX = math.clamp(newX, 0, 0.88)
+        newY = math.clamp(newY, 0, 0.88)
+        iconButton.Position = UDim2.new(newX, 0, newY, 0)
     end
 end)
 
--- CORRIGIDO: InputEnded decide se foi clique ou arrasto
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if dragging and not wasDragged then
-            -- Foi um toque simples: abre/fecha
+        dragging = false
+    end
+end)
+
+iconButton.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if not wasDragged then
             if uiVisible then
                 Window:SetVisible(false)
                 uiVisible = false
@@ -94,7 +93,7 @@ UserInputService.InputEnded:Connect(function(input)
                 uiVisible = true
             end
         end
-        dragging = false
+        wasDragged = false
     end
 end)
 
@@ -141,20 +140,20 @@ end
 local function autoCollectPet(pet, folderName)
     if not pet or not pet.Parent then return false end
     if not player or not player.Character then return false end
-    
+
     pressE()
-    
+
     for _, prompt in ipairs(pet:GetDescendants()) do
         if prompt:IsA("ProximityPrompt") then
             prompt:PromptButtonHold(player)
         end
     end
-    
+
     local clickDetector = pet:FindFirstChildWhichIsA("ClickDetector")
     if clickDetector then
         clickDetector:Click()
     end
-    
+
     local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if humanoidRootPart then
         local touchInterest = pet:FindFirstChild("TouchInterest")
@@ -163,13 +162,13 @@ local function autoCollectPet(pet, folderName)
             firetouchinterest(pet, humanoidRootPart, 1)
         end
     end
-    
+
     for _, remote in ipairs(pet:GetDescendants()) do
         if remote:IsA("RemoteEvent") and (remote.Name:lower():find("collect") or remote.Name:lower():find("click")) then
             remote:FireServer()
         end
     end
-    
+
     local petPart = pet:IsA("BasePart") and pet or pet:FindFirstChildWhichIsA("BasePart")
     if petPart then
         local mouse = player:GetMouse()
@@ -178,23 +177,23 @@ local function autoCollectPet(pet, folderName)
             mouse.Button1Click:Fire()
         end
     end
-    
+
     return true
 end
 
 local function collectPetsInFolder(folder, folderName)
     if not folder then return false end
-    
+
     local playerPos = getPlayerPosition()
     if not playerPos then return false end
-    
+
     for _, pet in ipairs(folder:GetChildren()) do
         if pet and pet.Parent then
-            local petPart = pet:FindFirstChild("PrimaryPart") or 
-                            pet:FindFirstChild("HumanoidRootPart") or 
+            local petPart = pet:FindFirstChild("PrimaryPart") or
+                            pet:FindFirstChild("HumanoidRootPart") or
                             (pet:IsA("BasePart") and pet) or
                             pet:FindFirstChildWhichIsA("BasePart")
-            
+
             if petPart and petPart.Parent then
                 local distance = (playerPos - petPart.Position).Magnitude
                 if distance <= COLLECT_DISTANCE then
@@ -204,7 +203,7 @@ local function collectPetsInFolder(folder, folderName)
             end
         end
     end
-    
+
     return false
 end
 
@@ -331,7 +330,7 @@ player.CharacterAdded:Connect(function(Character)
 end)
 
 -- ============================================
--- NOCLIP CORRIGIDO
+-- NOCLIP
 -- ============================================
 
 local NoclipEnabled = false
@@ -410,9 +409,7 @@ local function destroyWaves()
         local waves = tsunami:FindFirstChild("Waves")
         if waves then
             for _, wave in pairs(waves:GetChildren()) do
-                pcall(function()
-                    wave:Destroy()
-                end)
+                pcall(function() wave:Destroy() end)
             end
         end
     end
@@ -451,7 +448,7 @@ local function removeWaveDamage()
                 pcall(function()
                     for _, obj in pairs(wave:GetDescendants()) do
                         if obj:IsA("Script") or obj:IsA("LocalScript") then
-                            if obj.Name:lower():find("damage") or 
+                            if obj.Name:lower():find("damage") or
                                obj.Name:lower():find("kill") or
                                obj.Name:lower():find("hurt") then
                                 obj.Disabled = true
@@ -473,12 +470,10 @@ local function blockWaveSpawn()
         for _, script in pairs(tsunami:GetDescendants()) do
             if script:IsA("Script") or script:IsA("LocalScript") then
                 local scriptName = script.Name:lower()
-                if scriptName:find("wave") or 
-                   scriptName:find("spawn") or 
+                if scriptName:find("wave") or
+                   scriptName:find("spawn") or
                    scriptName:find("tsunami") then
-                    pcall(function()
-                        script.Disabled = true
-                    end)
+                    pcall(function() script.Disabled = true end)
                 end
             end
         end
@@ -566,18 +561,10 @@ Tabs.Settings:AddButton({
 Tabs.Settings:AddButton({
     Title = "Resetar Tudo",
     Callback = function()
-        if Options.AutoPetToggle.Value then
-            Options.AutoPetToggle:SetValue(false)
-        end
-        if Options.SpeedToggle.Value then
-            Options.SpeedToggle:SetValue(false)
-        end
-        if Options.NoclipToggle.Value then
-            Options.NoclipToggle:SetValue(false)
-        end
-        if Options.NoWaveToggle.Value then
-            Options.NoWaveToggle:SetValue(false)
-        end
+        if Options.AutoPetToggle.Value then Options.AutoPetToggle:SetValue(false) end
+        if Options.SpeedToggle.Value then Options.SpeedToggle:SetValue(false) end
+        if Options.NoclipToggle.Value then Options.NoclipToggle:SetValue(false) end
+        if Options.NoWaveToggle.Value then Options.NoWaveToggle:SetValue(false) end
         Fluent:Notify({
             Title = "Resetado",
             Content = "Todas funcoes desativadas",
