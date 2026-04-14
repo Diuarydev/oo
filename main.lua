@@ -5,25 +5,30 @@
 local player = game.Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 
 -- ============================================
 -- VARIAVEIS
 -- ============================================
 
-local AutoPetActive = false
 local SpeedActive = false
 local NoclipActive = false
 local NoWaveActive = false
-local AutoPetLoop = nil
+local DivinoActive = false
+local PrismaticoActive = false
 local SpeedLoop = nil
 local NoclipConnection = nil
 local NoWaveLoop = nil
-local COLLECT_DISTANCE = 25
+local DivinoLoop = nil
+local PrismaticoLoop = nil
 local healthConnection = nil
 
+-- POSICOES FIXAS
+local R7_POSITION = Vector3.new(-959.887451171875, 21.7581787109375, 4061.0625)
+local R8_POSITION = Vector3.new(-1593.5523681640625, -70.22384643554688, 4064.4248046875)
+local BASE_POSITION = Vector3.new(905.006103515625, -23.359270095825195, 4066.5439453125)
+
 -- ============================================
--- ICONE FLUTUANTE
+-- ICONE FLUTUANTE (PROPORCOES CORRIGIDAS)
 -- ============================================
 
 local iconGui = Instance.new("ScreenGui")
@@ -32,13 +37,13 @@ iconGui.Parent = game:GetService("CoreGui")
 iconGui.ResetOnSpawn = false
 
 local iconButton = Instance.new("TextButton")
-iconButton.Size = UDim2.new(0, 60, 0, 60)
-iconButton.Position = UDim2.new(1, -75, 0.85, -35)
+iconButton.Size = UDim2.new(0, 55, 0, 55)
+iconButton.Position = UDim2.new(1, -65, 0.85, -30)
 iconButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 iconButton.BackgroundTransparency = 0.3
 iconButton.Text = "💛"
 iconButton.TextColor3 = Color3.fromRGB(255, 255, 0)
-iconButton.TextSize = 35
+iconButton.TextSize = 30
 iconButton.Font = Enum.Font.GothamBold
 iconButton.Parent = iconGui
 
@@ -46,7 +51,10 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(1, 0)
 corner.Parent = iconButton
 
--- Menu flutuante (arrastável)
+-- ============================================
+-- MENU PRINCIPAL (PROPORCOES CORRIGIDAS)
+-- ============================================
+
 local menuGui = Instance.new("ScreenGui")
 menuGui.Name = "DiuaryMenu"
 menuGui.Parent = game:GetService("CoreGui")
@@ -54,75 +62,66 @@ menuGui.ResetOnSpawn = false
 menuGui.Enabled = true
 
 local menuFrame = Instance.new("Frame")
-menuFrame.Size = UDim2.new(0, 250, 0, 310)
-menuFrame.Position = UDim2.new(0.5, -125, 0.3, 0)
-menuFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-menuFrame.BackgroundTransparency = 0.1
+menuFrame.Size = UDim2.new(0, 220, 0, 320)
+menuFrame.Position = UDim2.new(0.5, -110, 0.35, 0)
+menuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+menuFrame.BackgroundTransparency = 0.15
 menuFrame.BorderSizePixel = 0
 menuFrame.Parent = menuGui
 menuFrame.Active = true
 menuFrame.Draggable = true
 
 local menuCorner = Instance.new("UICorner")
-menuCorner.CornerRadius = UDim.new(0, 10)
+menuCorner.CornerRadius = UDim.new(0, 12)
 menuCorner.Parent = menuFrame
 
+-- TITULO
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
+title.Size = UDim2.new(1, 0, 0, 35)
 title.Position = UDim2.new(0, 0, 0, 0)
 title.Text = "Diuary Hub"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
-title.TextSize = 20
+title.TextSize = 18
 title.Parent = menuFrame
 
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 40)
-titleBar.BackgroundTransparency = 1
-titleBar.Parent = menuFrame
+-- LINHA SEPARADORA
+local line = Instance.new("Frame")
+line.Size = UDim2.new(0.9, 0, 0, 1)
+line.Position = UDim2.new(0.05, 0, 0, 35)
+line.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+line.BorderSizePixel = 0
+line.Parent = menuFrame
 
-local function createButton(text, yPos, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 40)
-    btn.Position = UDim2.new(0.05, 0, 0, yPos)
-    btn.Text = text
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.Parent = menuFrame
-    
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 5)
-    btnCorner.Parent = btn
-    
-    btn.MouseButton1Click:Connect(callback)
-    return btn
-end
+-- ============================================
+-- FUNCAO CRIAR TOGGLE (PROPORCOES CORRIGIDAS)
+-- ============================================
 
 local function createToggle(text, yPos, getState, setState)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 40)
-    btn.Position = UDim2.new(0.05, 0, 0, yPos)
+    btn.Size = UDim2.new(0.85, 0, 0, 38)
+    btn.Position = UDim2.new(0.075, 0, 0, yPos)
     btn.Text = text .. ": OFF"
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 13
     btn.Parent = menuFrame
     
     local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 5)
+    btnCorner.CornerRadius = UDim.new(0, 6)
     btnCorner.Parent = btn
     
     local function update()
         if getState() then
             btn.Text = text .. ": ON"
             btn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         else
             btn.Text = text .. ": OFF"
-            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            btn.TextColor3 = Color3.fromRGB(220, 220, 220)
         end
     end
     
@@ -136,135 +135,182 @@ local function createToggle(text, yPos, getState, setState)
 end
 
 -- ============================================
--- AUTO PET (OTIMIZADO PARA MOBILE)
+-- FUNCAO CRIAR BOTAO (PROPORCOES CORRIGIDAS)
 -- ============================================
 
-local petFolders = {
-    {path = {"Tsunami", "Gen", "R7"}, name = "R7"},
-    {path = {"Tsunami", "Gen", "R8"}, name = "R8"}
-}
-
-local function getPlayerPosition()
-    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        return player.Character.HumanoidRootPart.Position
-    end
-    return nil
+local function createButton(text, yPos, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.85, 0, 0, 38)
+    btn.Position = UDim2.new(0.075, 0, 0, yPos)
+    btn.Text = text
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 13
+    btn.Parent = menuFrame
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = btn
+    
+    btn.MouseButton1Click:Connect(callback)
+    return btn
 end
 
-local function getPetFolder(folderPath)
-    local current = workspace
-    for _, folderName in ipairs(folderPath) do
-        current = current:FindFirstChild(folderName)
-        if not current then
-            return nil
+-- ============================================
+-- FUNCOES GERAIS
+-- ============================================
+
+local function teleport(pos)
+    local char = player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.CFrame = CFrame.new(pos)
+        task.wait(0.1)
+    end
+end
+
+local function findPets(folderName)
+    local pets = {}
+    local tsunami = workspace:FindFirstChild("Tsunami")
+    if tsunami and tsunami:FindFirstChild("Gen") then
+        local gen = tsunami.Gen
+        local folder = gen:FindFirstChild(folderName)
+        if folder then
+            for _, p in pairs(folder:GetChildren()) do
+                table.insert(pets, p)
+            end
         end
     end
-    return current
+    return pets
 end
 
--- Press E com delay maior para mobile
+local function getPetPos(pet)
+    local part = pet:FindFirstChild("PrimaryPart") or 
+                 pet:FindFirstChild("HumanoidRootPart") or 
+                 (pet:IsA("BasePart") and pet) or
+                 pet:FindFirstChildWhichIsA("BasePart")
+    return part and part.Position or nil
+end
+
 local function pressE()
-    local virtualInput = game:GetService("VirtualInputManager")
-    virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(1.2)  -- Aumentado para mobile
-    virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-    task.wait(0.3)  -- Delay extra
+    local vm = game:GetService("VirtualInputManager")
+    vm:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(1)
+    vm:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    task.wait(0.3)
 end
 
-local function autoCollectPet(pet, folderName)
-    if not pet or not pet.Parent then return false end
-    if not player or not player.Character then return false end
-    
-    -- Tenta coletar com E
-    pressE()
-    
-    -- Tenta outros métodos
-    for _, prompt in ipairs(pet:GetDescendants()) do
+local function tryOtherMethods(pet)
+    for _, prompt in pairs(pet:GetDescendants()) do
         if prompt:IsA("ProximityPrompt") then
             pcall(function() prompt:PromptButtonHold(player) end)
         end
     end
     
-    local clickDetector = pet:FindFirstChildWhichIsA("ClickDetector")
-    if clickDetector then
-        pcall(function() clickDetector:Click() end)
+    local click = pet:FindFirstChildWhichIsA("ClickDetector")
+    if click then
+        pcall(function() click:Click() end)
     end
     
-    local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if humanoidRootPart then
-        local touchInterest = pet:FindFirstChild("TouchInterest")
-        if touchInterest then
-            pcall(function()
-                firetouchinterest(pet, humanoidRootPart, 0)
-                firetouchinterest(pet, humanoidRootPart, 1)
-            end)
-        end
-    end
-    
-    for _, remote in ipairs(pet:GetDescendants()) do
-        if remote:IsA("RemoteEvent") and (remote.Name:lower():find("collect") or remote.Name:lower():find("click")) then
-            pcall(function() remote:FireServer() end)
-        end
-    end
-    
-    return true
-end
-
-local function collectPetsInFolder(folder, folderName)
-    if not folder then return false end
-    
-    local playerPos = getPlayerPosition()
-    if not playerPos then return false end
-    
-    for _, pet in ipairs(folder:GetChildren()) do
-        if pet and pet.Parent then
-            local petPart = pet:FindFirstChild("PrimaryPart") or 
-                            pet:FindFirstChild("HumanoidRootPart") or 
-                            (pet:IsA("BasePart") and pet) or
-                            pet:FindFirstChildWhichIsA("BasePart")
-            
-            if petPart and petPart.Parent then
-                local distance = (playerPos - petPart.Position).Magnitude
-                if distance <= COLLECT_DISTANCE then
-                    autoCollectPet(pet, folderName)
-                    task.wait(0.5) -- Delay maior para mobile
-                end
+    for _, remote in pairs(pet:GetDescendants()) do
+        if remote:IsA("RemoteEvent") then
+            local name = remote.Name:lower()
+            if name:find("collect") or name:find("click") or name:find("claim") then
+                pcall(function() remote:FireServer() end)
             end
         end
     end
-    
-    return false
 end
 
-local function collectAllNearbyPets()
-    for _, folderInfo in ipairs(petFolders) do
-        local folder = getPetFolder(folderInfo.path)
-        if folder then
-            collectPetsInFolder(folder, folderInfo.name)
+-- ============================================
+-- DIVINO - R7
+-- ============================================
+
+local function divinoLoop()
+    while DivinoActive do
+        teleport(R7_POSITION)
+        task.wait(1)
+        
+        local pets = findPets("R7")
+        
+        if #pets > 0 then
+            for _, pet in pairs(pets) do
+                local petPos = getPetPos(pet)
+                if petPos then
+                    teleport(petPos)
+                    task.wait(0.5)
+                    pressE()
+                    tryOtherMethods(pet)
+                    print("Divino coletou:", pet.Name)
+                    task.wait(0.5)
+                end
+            end
+            
+            teleport(BASE_POSITION)
+            task.wait(1)
+        else
+            task.wait(2)
         end
     end
 end
 
-local function autoCollectLoop()
-    while AutoPetActive do
-        pcall(function()
-            collectAllNearbyPets()
-        end)
-        task.wait(0.5) -- Delay do loop aumentado
+function SetDivino(active)
+    DivinoActive = active
+    if DivinoActive then
+        if DivinoLoop then coroutine.close(DivinoLoop) end
+        DivinoLoop = coroutine.create(divinoLoop)
+        coroutine.resume(DivinoLoop)
+        print("Divino: ON")
+    else
+        if DivinoLoop then coroutine.close(DivinoLoop) end
+        DivinoLoop = nil
+        print("Divino: OFF")
     end
 end
 
-function SetAutoPet(active)
-    AutoPetActive = active
-    if AutoPetActive then
-        if AutoPetLoop then coroutine.close(AutoPetLoop) end
-        AutoPetLoop = coroutine.create(autoCollectLoop)
-        coroutine.resume(AutoPetLoop)
-        print("✅ Auto Pet: ON")
+-- ============================================
+-- PRISMATICO - R8
+-- ============================================
+
+local function prismaticoLoop()
+    while PrismaticoActive do
+        teleport(R8_POSITION)
+        task.wait(1)
+        
+        local pets = findPets("R8")
+        
+        if #pets > 0 then
+            for _, pet in pairs(pets) do
+                local petPos = getPetPos(pet)
+                if petPos then
+                    teleport(petPos)
+                    task.wait(0.5)
+                    pressE()
+                    tryOtherMethods(pet)
+                    print("Prismatico coletou:", pet.Name)
+                    task.wait(0.5)
+                end
+            end
+            
+            teleport(BASE_POSITION)
+            task.wait(1)
+        else
+            task.wait(2)
+        end
+    end
+end
+
+function SetPrismatico(active)
+    PrismaticoActive = active
+    if PrismaticoActive then
+        if PrismaticoLoop then coroutine.close(PrismaticoLoop) end
+        PrismaticoLoop = coroutine.create(prismaticoLoop)
+        coroutine.resume(PrismaticoLoop)
+        print("Prismatico: ON")
     else
-        if AutoPetLoop then coroutine.close(AutoPetLoop) end
-        AutoPetLoop = nil
-        print("❌ Auto Pet: OFF")
+        if PrismaticoLoop then coroutine.close(PrismaticoLoop) end
+        PrismaticoLoop = nil
+        print("Prismatico: OFF")
     end
 end
 
@@ -290,7 +336,7 @@ function SetSpeed(active)
                 end
             end
         end)
-        print("✅ Speed: ON (450)")
+        print("Speed: ON (450)")
     else
         if SpeedLoop then
             SpeedLoop:Disconnect()
@@ -300,7 +346,7 @@ function SetSpeed(active)
         if Character and Character:FindFirstChild("Humanoid") then
             Character.Humanoid.WalkSpeed = 16
         end
-        print("❌ Speed: OFF")
+        print("Speed: OFF")
     end
 end
 
@@ -324,7 +370,7 @@ function SetNoclip(active)
                 end
             end
         end)
-        print("✅ Noclip: ON")
+        print("Noclip: ON")
     else
         if NoclipConnection then
             NoclipConnection:Disconnect()
@@ -338,12 +384,12 @@ function SetNoclip(active)
                 end
             end
         end
-        print("❌ Noclip: OFF")
+        print("Noclip: OFF")
     end
 end
 
 -- ============================================
--- NO WAVE OTIMIZADO (SEM LAG)
+-- NO WAVE
 -- ============================================
 
 local lastWaveClean = 0
@@ -405,7 +451,7 @@ function SetNoWave(active)
         coroutine.resume(NoWaveLoop)
         protectPlayer()
         destroyWaves()
-        print("✅ No Wave: ON")
+        print("No Wave: ON")
     else
         if NoWaveLoop then 
             coroutine.close(NoWaveLoop) 
@@ -415,7 +461,7 @@ function SetNoWave(active)
             healthConnection:Disconnect()
             healthConnection = nil
         end
-        print("❌ No Wave: OFF")
+        print("No Wave: OFF")
     end
 end
 
@@ -423,19 +469,21 @@ end
 -- CRIAR BOTOES DO MENU
 -- ============================================
 
-createToggle("Auto Pet", 50, function() return AutoPetActive end, SetAutoPet)
-createToggle("Speed 450", 100, function() return SpeedActive end, SetSpeed)
-createToggle("Noclip", 150, function() return NoclipActive end, SetNoclip)
-createToggle("No Wave", 200, function() return NoWaveActive end, SetNoWave)
+createToggle("Divino", 45, function() return DivinoActive end, SetDivino)
+createToggle("Prismatico", 88, function() return PrismaticoActive end, SetPrismatico)
+createToggle("Speed 450", 131, function() return SpeedActive end, SetSpeed)
+createToggle("Noclip", 174, function() return NoclipActive end, SetNoclip)
+createToggle("No Wave", 217, function() return NoWaveActive end, SetNoWave)
 
-local closeBtn = createButton("Fechar", 260, function()
+local closeBtn = createButton("Fechar", 270, function()
     menuGui.Enabled = false
 end)
 
--- Fechar menu com o ícone
-local menuVisible = true
+-- ============================================
+-- CONTROLE DO ICONE (ABRIR/FECHAR MENU)
+-- ============================================
 
--- Arrastar ícone
+local menuVisible = true
 local dragging = false
 local dragStart = nil
 local startPos = nil
@@ -478,7 +526,7 @@ UserInputService.InputEnded:Connect(function(input)
                 if menuVisible then
                     menuGui.Enabled = false
                     menuVisible = false
-                    iconButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+                    iconButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
                 else
                     menuGui.Enabled = true
                     menuVisible = true
@@ -492,6 +540,4 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
-print("✅ Diuary Hub Carregado!")
-print("💛 Clique no ícone para abrir/fechar o menu")
-print("📱 Versão otimizada para mobile!")
+print("Diuary Hub Carregado!")
