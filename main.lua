@@ -321,14 +321,36 @@ player.CharacterAdded:Connect(function(Character)
 end)
 
 -- ============================================
--- NOCLIP
+-- NOCLIP CORRIGIDO (SEM BUG)
 -- ============================================
 
 local NoclipEnabled = false
 local NoclipConnection = nil
+local OriginalCollision = {}
+
+local function SaveOriginalCollision()
+    local Character = player.Character
+    if Character then
+        for _, part in pairs(Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                OriginalCollision[part] = part.CanCollide
+            end
+        end
+    end
+end
+
+local function RestoreCollision()
+    for part, value in pairs(OriginalCollision) do
+        if part and part.Parent then
+            part.CanCollide = value
+        end
+    end
+    OriginalCollision = {}
+end
 
 local function StartNoclip()
     if NoclipConnection then return end
+    SaveOriginalCollision()
     NoclipConnection = game:GetService("RunService").Stepped:Connect(function()
         if NoclipEnabled then
             local Character = player.Character
@@ -348,14 +370,7 @@ local function StopNoclip()
         NoclipConnection:Disconnect()
         NoclipConnection = nil
     end
-    local Character = player.Character
-    if Character then
-        for _, part in pairs(Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-            end
-        end
-    end
+    RestoreCollision()
 end
 
 local NoclipToggle = Tabs.Main:AddToggle("NoclipToggle", {
@@ -369,6 +384,160 @@ NoclipToggle:OnChanged(function()
         StartNoclip()
     else
         StopNoclip()
+    end
+end)
+
+-- ============================================
+-- NO WAVE (ANTI-TSUNAMI)
+-- ============================================
+
+local NoWaveEnabled = false
+local NoWaveLoop = nil
+
+local function destroyWaves()
+    local tsunami = workspace:FindFirstChild("Tsunami")
+    if tsunami then
+        local waves = tsunami:FindFirstChild("Waves")
+        if waves then
+            for _, wave in pairs(waves:GetChildren()) do
+                pcall(function()
+                    wave:Destroy()
+                end)
+            end
+        end
+    end
+end
+
+local function hideWaves()
+    local tsunami = workspace:FindFirstChild("Tsunami")
+    if tsunami then
+        local waves = tsunami:FindFirstChild("Waves")
+        if waves then
+            for _, wave in pairs(waves:GetChildren()) do
+                pcall(function()
+                    if wave:IsA("BasePart") then
+                        wave.Transparency = 1
+                        wave.CanCollide = false
+                    elseif wave:IsA("Model") then
+                        for _, part in pairs(wave:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                part.Transparency = 1
+                                part.CanCollide = false
+                            end
+                        end
+                    end
+                end)
+            end
+        end
+    end
+end
+
+local function removeWaveDamage()
+    local tsunami = workspace:FindFirstChild("Tsunami")
+    if tsunami then
+        local waves = tsunami:FindFirstChild("Waves")
+        if waves then
+            for _, wave in pairs(waves:GetChildren()) do
+                pcall(function()
+                    for _, obj in pairs(wave:GetDescendants()) do
+                        if obj:IsA("Script") or obj:IsA("LocalScript") then
+                            if obj.Name:lower():find("damage") or 
+                               obj.Name:lower():find("kill") or
+                               obj.Name:lower():find("hurt") then
+                                obj.Disabled = true
+                            end
+                        end
+                        if obj:IsA("TouchInterest") then
+                            obj:Destroy()
+                        end
+                    end
+                end)
+            end
+        end
+    end
+end
+
+local function blockWaveSpawn()
+    local tsunami = workspace:FindFirstChild("Tsunami")
+    if tsunami then
+        for _, script in pairs(tsunami:GetDescendants()) do
+            if script:IsA("Script") or script:IsA("LocalScript") then
+                local scriptName = script.Name:lower()
+                if scriptName:find("wave") or 
+                   scriptName:find("spawn") or 
+                   scriptName:find("tsunami") then
+                    pcall(function()
+                        script.Disabled = true
+                    end)
+                end
+            end
+        end
+    end
+end
+
+local function protectPlayer()
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+                if NoWaveEnabled then
+                    if humanoid.Health < humanoid.MaxHealth then
+                        humanoid.Health = humanoid.MaxHealth
+                    end
+                end
+            end)
+        end
+    end
+end
+
+local function NoWaveLoopFunction()
+    while NoWaveEnabled do
+        pcall(function()
+            destroyWaves()
+            hideWaves()
+            removeWaveDamage()
+            blockWaveSpawn()
+            protectPlayer()
+        end)
+        task.wait(0.3)
+    end
+end
+
+local function StartNoWave()
+    if NoWaveLoop then return end
+    NoWaveEnabled = true
+    NoWaveLoop = task.spawn(NoWaveLoopFunction)
+    Fluent:Notify({
+        Title = "No Wave",
+        Content = "Ligado",
+        Duration = 2
+    })
+end
+
+local function StopNoWave()
+    NoWaveEnabled = false
+    if NoWaveLoop then
+        coroutine.close(NoWaveLoop)
+        NoWaveLoop = nil
+    end
+    Fluent:Notify({
+        Title = "No Wave",
+        Content = "Desligado",
+        Duration = 2
+    })
+end
+
+local NoWaveToggle = Tabs.Main:AddToggle("NoWaveToggle", {
+    Title = "No Wave",
+    Default = false
+})
+
+NoWaveToggle:OnChanged(function()
+    if Options.NoWaveToggle.Value then
+        StartNoWave()
+    else
+        StopNoWave()
     end
 end)
 
@@ -395,6 +564,9 @@ Tabs.Settings:AddButton({
         end
         if Options.NoclipToggle.Value then
             Options.NoclipToggle:SetValue(false)
+        end
+        if Options.NoWaveToggle.Value then
+            Options.NoWaveToggle:SetValue(false)
         end
         Fluent:Notify({
             Title = "Resetado",
