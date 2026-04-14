@@ -5,6 +5,7 @@
 local player = game.Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 -- ============================================
 -- VARIAVEIS
@@ -45,7 +46,7 @@ local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(1, 0)
 corner.Parent = iconButton
 
--- Menu flutuante simples
+-- Menu flutuante (arrastável)
 local menuGui = Instance.new("ScreenGui")
 menuGui.Name = "DiuaryMenu"
 menuGui.Parent = game:GetService("CoreGui")
@@ -53,12 +54,14 @@ menuGui.ResetOnSpawn = false
 menuGui.Enabled = true
 
 local menuFrame = Instance.new("Frame")
-menuFrame.Size = UDim2.new(0, 250, 0, 300)
-menuFrame.Position = UDim2.new(0.5, -125, 0.5, -150)
+menuFrame.Size = UDim2.new(0, 250, 0, 310)
+menuFrame.Position = UDim2.new(0.5, -125, 0.3, 0)
 menuFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 menuFrame.BackgroundTransparency = 0.1
 menuFrame.BorderSizePixel = 0
 menuFrame.Parent = menuGui
+menuFrame.Active = true
+menuFrame.Draggable = true
 
 local menuCorner = Instance.new("UICorner")
 menuCorner.CornerRadius = UDim.new(0, 10)
@@ -73,6 +76,11 @@ title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
 title.TextSize = 20
 title.Parent = menuFrame
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundTransparency = 1
+titleBar.Parent = menuFrame
 
 local function createButton(text, yPos, callback)
     local btn = Instance.new("TextButton")
@@ -128,7 +136,7 @@ local function createToggle(text, yPos, getState, setState)
 end
 
 -- ============================================
--- AUTO PET
+-- AUTO PET (OTIMIZADO PARA MOBILE)
 -- ============================================
 
 local petFolders = {
@@ -154,42 +162,48 @@ local function getPetFolder(folderPath)
     return current
 end
 
+-- Press E com delay maior para mobile
 local function pressE()
     local virtualInput = game:GetService("VirtualInputManager")
     virtualInput:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-    task.wait(0.9)
+    task.wait(1.2)  -- Aumentado para mobile
     virtualInput:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    task.wait(0.3)  -- Delay extra
 end
 
 local function autoCollectPet(pet, folderName)
     if not pet or not pet.Parent then return false end
     if not player or not player.Character then return false end
     
+    -- Tenta coletar com E
     pressE()
     
+    -- Tenta outros métodos
     for _, prompt in ipairs(pet:GetDescendants()) do
         if prompt:IsA("ProximityPrompt") then
-            prompt:PromptButtonHold(player)
+            pcall(function() prompt:PromptButtonHold(player) end)
         end
     end
     
     local clickDetector = pet:FindFirstChildWhichIsA("ClickDetector")
     if clickDetector then
-        clickDetector:Click()
+        pcall(function() clickDetector:Click() end)
     end
     
     local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if humanoidRootPart then
         local touchInterest = pet:FindFirstChild("TouchInterest")
         if touchInterest then
-            firetouchinterest(pet, humanoidRootPart, 0)
-            firetouchinterest(pet, humanoidRootPart, 1)
+            pcall(function()
+                firetouchinterest(pet, humanoidRootPart, 0)
+                firetouchinterest(pet, humanoidRootPart, 1)
+            end)
         end
     end
     
     for _, remote in ipairs(pet:GetDescendants()) do
         if remote:IsA("RemoteEvent") and (remote.Name:lower():find("collect") or remote.Name:lower():find("click")) then
-            remote:FireServer()
+            pcall(function() remote:FireServer() end)
         end
     end
     
@@ -213,7 +227,7 @@ local function collectPetsInFolder(folder, folderName)
                 local distance = (playerPos - petPart.Position).Magnitude
                 if distance <= COLLECT_DISTANCE then
                     autoCollectPet(pet, folderName)
-                    task.wait(0.05)
+                    task.wait(0.5) -- Delay maior para mobile
                 end
             end
         end
@@ -236,7 +250,7 @@ local function autoCollectLoop()
         pcall(function()
             collectAllNearbyPets()
         end)
-        task.wait(0.1)
+        task.wait(0.5) -- Delay do loop aumentado
     end
 end
 
@@ -334,7 +348,6 @@ end
 
 local lastWaveClean = 0
 
--- Destruir waves (limitado por tempo)
 local function destroyWaves()
     local now = tick()
     if now - lastWaveClean < 1.5 then return end
@@ -351,7 +364,6 @@ local function destroyWaves()
     end
 end
 
--- Proteger jogador (mais leve)
 local function protectPlayer()
     local character = player.Character
     if character then
@@ -369,17 +381,15 @@ local function protectPlayer()
     end
 end
 
--- Loop ultra leve do No Wave
 local function noWaveLoop()
     while NoWaveActive do
         pcall(function()
             destroyWaves()
         end)
-        task.wait(1.5) -- Verifica a cada 1.5 segundos (menos lag)
+        task.wait(1.5)
     end
 end
 
--- Monitorar quando o personagem spawna
 player.CharacterAdded:Connect(function()
     task.wait(0.5)
     if NoWaveActive then
@@ -394,8 +404,8 @@ function SetNoWave(active)
         NoWaveLoop = coroutine.create(noWaveLoop)
         coroutine.resume(NoWaveLoop)
         protectPlayer()
-        destroyWaves() -- Executa uma vez imediatamente
-        print("✅ No Wave: ON (Modo leve)")
+        destroyWaves()
+        print("✅ No Wave: ON")
     else
         if NoWaveLoop then 
             coroutine.close(NoWaveLoop) 
@@ -414,32 +424,12 @@ end
 -- ============================================
 
 createToggle("Auto Pet", 50, function() return AutoPetActive end, SetAutoPet)
-createToggle("Speed (450)", 100, function() return SpeedActive end, SetSpeed)
+createToggle("Speed 450", 100, function() return SpeedActive end, SetSpeed)
 createToggle("Noclip", 150, function() return NoclipActive end, SetNoclip)
 createToggle("No Wave", 200, function() return NoWaveActive end, SetNoWave)
 
 local closeBtn = createButton("Fechar", 260, function()
     menuGui.Enabled = false
-end)
-
-local openBtn = Instance.new("TextButton")
-openBtn.Size = UDim2.new(0, 80, 0, 30)
-openBtn.Position = UDim2.new(0.5, -40, 0.7, 0)
-openBtn.Text = "Abrir Menu"
-openBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-openBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-openBtn.Font = Enum.Font.GothamBold
-openBtn.TextSize = 14
-openBtn.Visible = false
-openBtn.Parent = menuFrame
-
-local openBtnCorner = Instance.new("UICorner")
-openBtnCorner.CornerRadius = UDim.new(0, 5)
-openBtnCorner.Parent = openBtn
-
-openBtn.MouseButton1Click:Connect(function()
-    menuGui.Enabled = true
-    openBtn.Visible = false
 end)
 
 -- Fechar menu com o ícone
@@ -504,3 +494,4 @@ end)
 
 print("✅ Diuary Hub Carregado!")
 print("💛 Clique no ícone para abrir/fechar o menu")
+print("📱 Versão otimizada para mobile!")
